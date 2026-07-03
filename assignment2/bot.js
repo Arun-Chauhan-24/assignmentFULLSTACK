@@ -60,12 +60,9 @@ bot.onText(/\/export/, async (msg) => {
 
   // Build CSV string manually (no library)
   const header = 'RollNumber,Timestamp';
-  const rows = stats.rollNumbers.map(roll => {
-    // Read timestamp from the store via getStats — re-read file for timestamp
-    const raw = fs.readFileSync('./attendance.json', 'utf8');
-    const store = JSON.parse(raw);
-    return [roll, store[roll].timestamp].join(',');
-  });
+  const raw = fs.readFileSync('./attendance.json', 'utf8');
+  const store = JSON.parse(raw);
+  const rows = stats.rollNumbers.map(roll => [roll, store[roll].timestamp].join(','));
   const csvContent = [header, ...rows].join('\n');
 
   // Write to temp file
@@ -85,6 +82,7 @@ bot.onText(/\/export/, async (msg) => {
 // Photo handler
 bot.on('photo', async (msg) => {
   const chatId = msg.chat.id;
+  let downloadedPath;
 
   try {
     // Get highest resolution photo (last item in array)
@@ -92,20 +90,17 @@ bot.on('photo', async (msg) => {
     const photo = photoArray[photoArray.length - 1];
     const fileId = photo.file_id;
 
-    // Download image to temp directory
-    const tmpPath = path.join(os.tmpdir(), fileId + '.jpg');
-    await bot.downloadFile(fileId, os.tmpdir());
+    // Download image to temp directory — capture the ACTUAL saved path,
+    // since node-telegram-bot-api names the file itself (not fileId + '.jpg').
+    downloadedPath = await bot.downloadFile(fileId, os.tmpdir());
 
     // Decode QR
     let qrString;
     try {
-      qrString = await decodeQR(tmpPath);
+      qrString = await decodeQR(downloadedPath);
     } catch (err) {
       bot.sendMessage(chatId, '❌ No QR code found in the image. Please send a clear photo of the ID card.');
       return;
-    } finally {
-      // Clean up temp file
-      try { fs.unlinkSync(tmpPath); } catch {}
     }
 
     // Extract roll number
@@ -119,7 +114,7 @@ bot.on('photo', async (msg) => {
     if (!isRegistered(rollNumber)) {
       bot.sendMessage(
         chatId,
-        `⚠️ Roll number *${rollNumber}* is out of the registered range (240001–240400).`,
+        `⚠️ Roll number *${rollNumber}* is not in the registered range.`,
         { parse_mode: 'Markdown' }
       );
       return;
@@ -146,6 +141,11 @@ bot.on('photo', async (msg) => {
   } catch (err) {
     console.error('Unexpected error in photo handler:', err);
     bot.sendMessage(chatId, '❌ An unexpected error occurred. Please try again.');
+  } finally {
+    // Clean up temp file
+    if (downloadedPath) {
+      try { fs.unlinkSync(downloadedPath); } catch {}
+    }
   }
 });
 

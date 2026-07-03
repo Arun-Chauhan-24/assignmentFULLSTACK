@@ -6,7 +6,7 @@ A Telegram bot that marks student attendance by scanning QR codes on IITK ID car
 
 - A volunteer sends a photo of a student's IITK ID card to the bot
 - The bot decodes the QR code on the card using `jimp` + `jsqr`
-- It extracts the roll number and validates it's in the registered range (240001–240400)
+- It extracts the roll number from the `<prefix>.<rollNumber>,<version>,<signature>.iitkidcard` QR format and validates it's in the registered range (240001–249999, adjustable in `parser.js`)
 - Marks the student present in a local `attendance.json` store
 - Handles duplicates gracefully (shows original timestamp)
 - `/report` command returns total count + list of present roll numbers
@@ -69,7 +69,7 @@ node bot.js
 | Already marked | ⚠️ Already marked — shows original timestamp |
 | QR not found | ❌ No QR code found in the image |
 | Roll number not in QR | ❌ Could not find a roll number |
-| Roll number out of range | ⚠️ Out of registered range |
+| Roll number out of range | ⚠️ Not in registered range |
 
 ## Files not to submit
 
